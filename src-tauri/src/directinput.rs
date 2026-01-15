@@ -491,6 +491,11 @@ impl InputDetector {
                         Err(_) => continue,
                     };
 
+                // DIAGNOSTIC: Log hat values in EVERY report to see if they're changing
+                if let Some(&hat_value) = current_report.axis_values.get(&0x39) {
+                    log::info!("[HID POLL] Device {}: Hat (0x39) = {}", device_instance, hat_value);
+                }
+
                 // Log all axes on first report for this device to help diagnose hat detection
                 if !self.prev_hid_reports.contains_key(&device.path) {
                     log::info!("[HID] Device {} initial axes:", device_instance);
