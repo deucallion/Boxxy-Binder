@@ -14,7 +14,7 @@ const MOVEMENT_THRESHOLD: f32 = 0.3;
 fn is_gamepad(name: &str) -> bool {
     let name_lower = name.to_lowercase();
 
-    eprintln!("is_gamepad: Checking device: '{}'", name);
+    log::info!("is_gamepad: Checking device: '{}'", name);
 
     // Common joystick/HOTAS identifiers - CHECK THESE FIRST to avoid misidentification
     let joystick_indicators = [
@@ -38,7 +38,7 @@ fn is_gamepad(name: &str) -> bool {
         .iter()
         .any(|indicator| name_lower.contains(indicator))
     {
-        eprintln!("is_gamepad: '{}' identified as JOYSTICK", name);
+        log::info!("is_gamepad: '{}' identified as JOYSTICK", name);
         return false;
     }
 
@@ -61,12 +61,12 @@ fn is_gamepad(name: &str) -> bool {
         .iter()
         .any(|indicator| name_lower.contains(indicator))
     {
-        eprintln!("is_gamepad: '{}' identified as GAMEPAD", name);
+        log::info!("is_gamepad: '{}' identified as GAMEPAD", name);
         return true;
     }
 
     // Generic devices that don't match either pattern default to JOYSTICK
-    eprintln!(
+    log::info!(
         "is_gamepad: '{}' defaulting to JOYSTICK (generic device)",
         name
     );
@@ -197,12 +197,12 @@ struct InputDetector {
 
 impl InputDetector {
     fn new(session_id: String) -> Self {
-        eprintln!("InputDetector: Initializing...");
+        log::info!("InputDetector: Initializing...");
 
         // Initialize XInput
         let xinput = XInputHandle::load_default().ok();
         if xinput.is_none() {
-            eprintln!("InputDetector: Failed to load XInput (or not on Windows)");
+            log::info!("InputDetector: Failed to load XInput (or not on Windows)");
         }
 
         let mut xinput_prev_states = [None, None, None, None];
@@ -212,7 +212,7 @@ impl InputDetector {
             for i in 0..4 {
                 if let Ok(state) = xinput.get_state(i) {
                     xinput_prev_states[i as usize] = Some(state);
-                    eprintln!("InputDetector: XInput controller {} initialized", i);
+                    log::info!("InputDetector: XInput controller {} initialized", i);
 
                     // Initialize axis states for this controller
                     let left_x = (state.raw.Gamepad.sThumbLX as f32) / 32768.0;
@@ -256,7 +256,7 @@ impl InputDetector {
                     opened_devices.insert(device.path.clone(), opened_dev);
                 }
                 Err(e) => {
-                    eprintln!(
+                    log::info!(
                         "InputDetector: Failed to open device {}: {}",
                         device.path, e
                     );
@@ -280,7 +280,7 @@ impl InputDetector {
             }
         }
 
-        eprintln!(
+        log::info!(
             "InputDetector: Monitoring {} HID devices and 4 XInput slots",
             hid_devices.len()
         );
@@ -493,7 +493,7 @@ impl InputDetector {
 
                 // Log all axes on first report for this device to help diagnose hat detection
                 if !self.prev_hid_reports.contains_key(&device.path) {
-                    eprintln!("[HID] Device {} initial axes:", device_instance);
+                    log::info!("[HID] Device {} initial axes:", device_instance);
                     for (&axis_id, &value) in &current_report.axis_values {
                         let name = current_report
                             .axis_names
@@ -505,7 +505,7 @@ impl InputDetector {
                             .get(&axis_id)
                             .copied()
                             .unwrap_or((0, 65535));
-                        eprintln!(
+                        log::info!(
                             "[HID]   axis_id=0x{:02x} ({:2}): {:<20} value={:5} range=[{}, {}] is_hat={}",
                             axis_id,
                             axis_id,
@@ -537,7 +537,7 @@ impl InputDetector {
 
                     // Debug logging for button detection
                     if !current_report.pressed_buttons.is_empty() || !prev_buttons.is_empty() {
-                        eprintln!(
+                        log::info!(
                         "Device {}: Current buttons: {:?}, Prev buttons: {:?}, Newly pressed: {:?}",
                         device_instance,
                         current_report.pressed_buttons,
@@ -599,7 +599,7 @@ impl InputDetector {
 
                         // Debug logging for ALL axes to help diagnose hat detection
                         if change_abs > 0.0 {
-                            eprintln!(
+                            log::info!(
                                 "[AXIS] Device {}: axis_id=0x{:02x} ({}), current={}, prev={}, change={:.1}, is_hat={}",
                                 device_instance,
                                 axis_id,
@@ -652,7 +652,7 @@ impl InputDetector {
                                     });
 
                                 // Debug logging for hat switch values
-                                eprintln!(
+                                log::info!(
                                     "[HAT] Device {}: axis_id=0x{:02x}, current_value={}, prev_value={}, logical_min={}, logical_max={}, range={}",
                                     device_instance, axis_id, current_value, prev_value, logical_min, logical_max, range
                                 );
@@ -675,7 +675,7 @@ impl InputDetector {
                                     discrete.min(8)
                                 };
 
-                                eprintln!("[HAT] Discrete value: {}", hat_discrete_value);
+                                log::info!("[HAT] Discrete value: {}", hat_discrete_value);
 
                                 let hat_direction = match hat_discrete_value {
                                     0 => Some("up"),
@@ -793,7 +793,7 @@ pub fn wait_for_input(
     let start = Instant::now();
     let timeout = Duration::from_secs(timeout_secs);
 
-    eprintln!(
+    log::info!(
         "wait_for_input: Starting hybrid input detection for {} seconds",
         timeout_secs
     );
@@ -818,7 +818,7 @@ pub fn wait_for_inputs_with_events(
     initial_timeout_secs: u64,
     collect_duration_secs: u64,
 ) -> Result<(), String> {
-    eprintln!("wait_for_inputs_with_events: Starting hybrid input detection");
+    log::info!("wait_for_inputs_with_events: Starting hybrid input detection");
 
     let mut detector = InputDetector::new(session_id.clone());
 
@@ -867,12 +867,12 @@ pub fn wait_for_inputs_with_events(
 pub fn detect_joysticks() -> Result<Vec<JoystickInfo>, String> {
     let mut joysticks = Vec::new();
 
-    eprintln!("=== Hybrid Device Detection (HID + XInput) ===");
+    log::info!("=== Hybrid Device Detection (HID + XInput) ===");
 
     // First, list HID game controllers (joysticks/HOTAS)
     match hid_reader::list_hid_game_controllers() {
         Ok(hid_devices) => {
-            eprintln!("Found {} HID game controllers", hid_devices.len());
+            log::info!("Found {} HID game controllers", hid_devices.len());
 
             for (idx, device) in hid_devices.iter().enumerate() {
                 let device_name = device.product.as_deref().unwrap_or("Unknown HID Device");
@@ -889,7 +889,7 @@ pub fn detect_joysticks() -> Result<Vec<JoystickInfo>, String> {
                         || full_name.to_lowercase().contains("xinput")
                         || full_name.to_lowercase().contains("controller for windows"))
                 {
-                    eprintln!(
+                    log::info!(
                         "HID Device {}: {} - SKIPPING (will use XInput instead)",
                         idx + 1,
                         full_name
@@ -897,7 +897,7 @@ pub fn detect_joysticks() -> Result<Vec<JoystickInfo>, String> {
                     continue;
                 }
 
-                eprintln!(
+                log::info!(
                     "HID Device {}: {} (VID: 0x{:04x}, PID: 0x{:04x})",
                     idx + 1,
                     full_name,
@@ -910,11 +910,11 @@ pub fn detect_joysticks() -> Result<Vec<JoystickInfo>, String> {
                     match hid_reader::get_axis_names_from_descriptor(&device.path) {
                         Ok(axis_names) => {
                             let axes = axis_names.len();
-                            eprintln!("  Detected {} axes from HID descriptor", axes);
+                            log::info!("  Detected {} axes from HID descriptor", axes);
                             (32, axes, 1)
                         }
                         Err(e) => {
-                            eprintln!("  Could not read descriptor: {}", e);
+                            log::info!("  Could not read descriptor: {}", e);
                             (32, 6, 1) // Defaults
                         }
                     };
@@ -943,7 +943,7 @@ pub fn detect_joysticks() -> Result<Vec<JoystickInfo>, String> {
             }
         }
         Err(e) => {
-            eprintln!("Failed to list HID devices: {}", e);
+            log::info!("Failed to list HID devices: {}", e);
         }
     }
 
@@ -951,7 +951,7 @@ pub fn detect_joysticks() -> Result<Vec<JoystickInfo>, String> {
     if let Ok(xinput) = XInputHandle::load_default() {
         for controller_id in 0..4 {
             if xinput.get_state(controller_id).is_ok() {
-                eprintln!("XInput slot {} active (Xbox Controller)", controller_id);
+                log::info!("XInput slot {} active (Xbox Controller)", controller_id);
 
                 joysticks.push(JoystickInfo {
                     id: joysticks.len() + 1, // Continue numbering after HID devices
@@ -968,7 +968,7 @@ pub fn detect_joysticks() -> Result<Vec<JoystickInfo>, String> {
         }
     }
 
-    eprintln!("=== Total devices found: {} ===", joysticks.len());
+    log::info!("=== Total devices found: {} ===", joysticks.len());
 
     Ok(joysticks)
 }

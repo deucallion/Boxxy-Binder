@@ -29,7 +29,7 @@ impl OpenedHidDevice {
 
         if len > 0 {
             // Only log if we actually read something to avoid spamming
-            // eprintln!("[HID] Read {} bytes from device", len);
+            // log::info!("[HID] Read {} bytes from device", len);
             Ok(buf[..len].to_vec())
         } else {
             Ok(Vec::new())
@@ -96,7 +96,7 @@ pub fn list_hid_game_controllers() -> Result<Vec<HidDeviceListItem>, String> {
         })
         .collect();
 
-    eprintln!("[HID] Found {} game controller devices", devices.len());
+    log::info!("[HID] Found {} game controller devices", devices.len());
 
     Ok(devices)
 }
@@ -119,21 +119,22 @@ pub fn read_hid_report(device_path: &str, timeout_ms: i32) -> Result<Vec<u8>, St
         .map_err(|e| format!("Failed to read from HID device: {}", e))?;
 
     if len > 0 {
-        eprintln!("[HID] Read {} bytes from device", len);
-        eprintln!("[HID] Raw report: {:?}", &buf[..len]);
+        log::info!("[HID] Read {} bytes from device", len);
+        log::info!("[HID] Raw report: {:?}", &buf[..len]);
 
         // Print first 16 bytes with positions for easier analysis
         if len >= 16 {
-            eprint!("[HID] Bytes 0-15:  ");
+            let mut bytes_line = String::from("[HID] Bytes 0-15:  ");
             for byte in buf.iter().take(16) {
-                eprint!("{:02X} ", byte);
+                bytes_line.push_str(&format!("{:02X} ", byte));
             }
-            eprintln!();
-            eprint!("[HID] Positions:   ");
+            log::info!("{}", bytes_line);
+
+            let mut pos_line = String::from("[HID] Positions:   ");
             for i in 0..16 {
-                eprint!("{:2} ", i);
+                pos_line.push_str(&format!("{:2} ", i));
             }
-            eprintln!();
+            log::info!("{}", pos_line);
         }
     }
 
@@ -193,7 +194,7 @@ pub fn parse_hid_full_report(report: &[u8], descriptor: &[u8]) -> Result<HidFull
                             if value != 0 {
                                 // Button is pressed
                                 pressed_buttons.push(button_index);
-                                eprintln!(
+                                log::info!(
                                     "[HID] Button {} pressed (value: {})",
                                     button_index, value
                                 );
@@ -201,7 +202,7 @@ pub fn parse_hid_full_report(report: &[u8], descriptor: &[u8]) -> Result<HidFull
                             button_index += 1;
                         }
                         Err(e) => {
-                            eprintln!("[HID] Failed to extract button value: {:?}", e);
+                            log::info!("[HID] Failed to extract button value: {:?}", e);
                             button_index += 1;
                         }
                     }
@@ -254,7 +255,7 @@ pub fn parse_hid_full_report(report: &[u8], descriptor: &[u8]) -> Result<HidFull
                         axis_ranges.insert(axis_index, (logical_min, logical_max));
                     }
                     Err(e) => {
-                        eprintln!("[HID] Failed to extract axis value: {:?}", e);
+                        log::info!("[HID] Failed to extract axis value: {:?}", e);
                     }
                 }
             }
@@ -269,12 +270,12 @@ pub fn parse_hid_full_report(report: &[u8], descriptor: &[u8]) -> Result<HidFull
                             if button_val > 0 && button_val <= 255 {
                                 // Valid button press (usage ID)
                                 pressed_buttons.push(button_val as u32);
-                                eprintln!("[HID] Array button {} pressed", button_val);
+                                log::info!("[HID] Array button {} pressed", button_val);
                             }
                         }
                     }
                     Err(e) => {
-                        eprintln!("[HID] Failed to extract array button value: {:?}", e);
+                        log::info!("[HID] Failed to extract array button value: {:?}", e);
                     }
                 }
             }
@@ -323,7 +324,7 @@ pub fn get_hid_descriptor_bytes(device_path: &str) -> Result<Vec<u8>, String> {
         .get_report_descriptor(&mut descriptor_buf)
         .map_err(|e| format!("Failed to get report descriptor: {}", e))?;
 
-    eprintln!("[HID] Report descriptor length: {} bytes", descriptor_len);
+    log::info!("[HID] Report descriptor length: {} bytes", descriptor_len);
     Ok(descriptor_buf[..descriptor_len].to_vec())
 }
 
@@ -361,7 +362,7 @@ pub fn get_directinput_to_hid_axis_mapping(device_path: &str) -> Result<HashMap<
                 let usage_id = u16::from(var.usage.usage_id) as u32;
                 mapping.insert(directinput_index, usage_id);
 
-                eprintln!(
+                log::info!(
                     "[Axis Mapping] DirectInput axis {} → HID usage ID {} ({})",
                     directinput_index,
                     usage_id,
@@ -388,18 +389,18 @@ fn parse_hid_descriptor_with_library(descriptor: &[u8]) -> Result<HashMap<u32, S
     let rdesc = ReportDescriptor::try_from(descriptor)
         .map_err(|e| format!("Failed to parse report descriptor: {:?}", e))?;
 
-    eprintln!("[HID] Successfully parsed report descriptor");
-    eprintln!("[HID] Input reports: {}", rdesc.input_reports().len());
-    eprintln!("[HID] Output reports: {}", rdesc.output_reports().len());
-    eprintln!("[HID] Feature reports: {}", rdesc.feature_reports().len());
+    log::info!("[HID] Successfully parsed report descriptor");
+    log::info!("[HID] Input reports: {}", rdesc.input_reports().len());
+    log::info!("[HID] Output reports: {}", rdesc.output_reports().len());
+    log::info!("[HID] Feature reports: {}", rdesc.feature_reports().len());
 
     // Iterate through all input reports
     for report in rdesc.input_reports() {
-        eprintln!(
+        log::info!(
             "[HID] Processing input report with ID: {:?}",
             report.report_id()
         );
-        eprintln!("[HID] Report has {} fields", report.fields().len());
+        log::info!("[HID] Report has {} fields", report.fields().len());
 
         // Iterate through all fields in the report
         for field in report.fields() {
@@ -419,7 +420,7 @@ fn parse_hid_descriptor_with_library(descriptor: &[u8]) -> Result<HashMap<u32, S
                     // This matches how we assign indices in parse_hid_axes_from_descriptor_bytes
                     let axis_index = u16::from(var.usage.usage_id) as u32;
 
-                    eprintln!(
+                    log::info!(
                         "[HID] Variable field: {} bits, usage: 0x{:08X}",
                         bits, usage_val
                     );
@@ -429,7 +430,7 @@ fn parse_hid_descriptor_with_library(descriptor: &[u8]) -> Result<HashMap<u32, S
                         .ok()
                         .map(|u| u.name().to_string())
                         .unwrap_or_else(|| {
-                            eprintln!(
+                            log::info!(
                                 "[HID] Warning: Could not resolve usage name for 0x{:08X}",
                                 usage_val
                             );
@@ -440,7 +441,7 @@ fn parse_hid_descriptor_with_library(descriptor: &[u8]) -> Result<HashMap<u32, S
                             )
                         });
 
-                    eprintln!(
+                    log::info!(
                         "[HID] Found axis {}: {} ({} bits, usage: 0x{:08X})",
                         axis_index, axis_name, bits, usage_val
                     );
@@ -449,17 +450,17 @@ fn parse_hid_descriptor_with_library(descriptor: &[u8]) -> Result<HashMap<u32, S
                 Field::Array(arr) => {
                     // Array fields are typically buttons
                     let bits = arr.bits.end - arr.bits.start;
-                    eprintln!("[HID] Array field: {} bits", bits);
+                    log::info!("[HID] Array field: {} bits", bits);
                 }
                 Field::Constant(_) => {
                     // Constant fields are padding
-                    eprintln!("[HID] Constant (padding) field");
+                    log::info!("[HID] Constant (padding) field");
                 }
             }
         }
     }
 
-    eprintln!("[HID] Total axes found: {}", axis_names.len());
+    log::info!("[HID] Total axes found: {}", axis_names.len());
 
     Ok(axis_names)
 }

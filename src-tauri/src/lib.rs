@@ -155,18 +155,18 @@ fn update_binding(
     activation_mode: Option<String>,
     state: tauri::State<Mutex<AppState>>,
 ) -> Result<(), String> {
-    eprintln!("update_binding called with:");
-    eprintln!("  action_map_name: '{}'", action_map_name);
-    eprintln!("  action_name: '{}'", action_name);
-    eprintln!("  new_input: '{}'", new_input);
-    eprintln!("  multi_tap: {:?}", multi_tap);
-    eprintln!("  activation_mode: {:?}", activation_mode);
+    log::info!("update_binding called with:");
+    log::info!("  action_map_name: '{}'", action_map_name);
+    log::info!("  action_name: '{}'", action_name);
+    log::info!("  new_input: '{}'", new_input);
+    log::info!("  multi_tap: {:?}", multi_tap);
+    log::info!("  activation_mode: {:?}", activation_mode);
 
     let mut app_state = state.lock().unwrap();
 
     if let Some(ref mut bindings) = app_state.current_bindings {
-        eprintln!("Current bindings available, checking action maps...");
-        eprintln!(
+        log::info!("Current bindings available, checking action maps...");
+        log::info!(
             "Available action maps: {:?}",
             bindings
                 .action_maps
@@ -181,8 +181,8 @@ fn update_binding(
             .iter_mut()
             .find(|am| am.name == action_map_name)
         {
-            eprintln!("Found action map: '{}'", action_map_name);
-            eprintln!(
+            log::info!("Found action map: '{}'", action_map_name);
+            log::info!(
                 "Available actions: {:?}",
                 action_map
                     .actions
@@ -197,7 +197,7 @@ fn update_binding(
                 .iter_mut()
                 .find(|a| a.name == action_name)
             {
-                eprintln!("Found action: '{}'", action_name);
+                log::info!("Found action: '{}'", action_name);
 
                 // Create the new rebind
                 let new_rebind = keybindings::Rebind {
@@ -205,7 +205,7 @@ fn update_binding(
                     multi_tap,
                     activation_mode: activation_mode.unwrap_or_default(),
                 };
-                eprintln!(
+                log::info!(
                     "New rebind: input='{}', multi_tap={:?}, activation_mode='{}'",
                     new_rebind.input, new_rebind.multi_tap, new_rebind.activation_mode
                 );
@@ -223,22 +223,22 @@ fn update_binding(
                 // Add the new binding
                 action.rebinds.push(new_rebind);
 
-                eprintln!("Successfully updated binding");
+                log::info!("Successfully updated binding");
                 return Ok(());
             } else {
-                eprintln!("Action '{}' not found in action map", action_name);
+                log::info!("Action '{}' not found in action map", action_name);
             }
         } else {
-            eprintln!("Action map '{}' not found", action_map_name);
+            log::info!("Action map '{}' not found", action_map_name);
         }
     } else {
-        eprintln!("No current bindings loaded in state");
+        log::info!("No current bindings loaded in state");
     }
 
     // If we couldn't find it in current_bindings, try to create the structure from all_binds
-    eprintln!("Attempting to use all_binds as template...");
+    log::info!("Attempting to use all_binds as template...");
     if let Some(ref all_binds) = app_state.all_binds {
-        eprintln!("AllBinds available, looking for action...");
+        log::info!("AllBinds available, looking for action...");
 
         // Find the action in all_binds to verify it exists
         let found = all_binds.action_maps.iter().any(|am| {
@@ -246,11 +246,11 @@ fn update_binding(
         });
 
         if found {
-            eprintln!("Action found in all_binds, creating user binding entry");
+            log::info!("Action found in all_binds, creating user binding entry");
 
             // Initialize or update current_bindings from all_binds structure
             if app_state.current_bindings.is_none() {
-                eprintln!("Creating new current_bindings structure");
+                log::info!("Creating new current_bindings structure");
                 app_state.current_bindings = Some(ActionMaps {
                     profile_name: "User Customizations".to_string(),
                     action_maps: Vec::new(),
@@ -295,7 +295,7 @@ fn update_binding(
 
                         // Add the new binding
                         action.rebinds.push(new_rebind);
-                        eprintln!("Successfully updated binding (existing action, replaced same device type)");
+                        log::info!("Successfully updated binding (existing action, replaced same device type)");
                         return Ok(());
                     } else {
                         // Create new action
@@ -308,7 +308,7 @@ fn update_binding(
                             }],
                         };
                         action_map.actions.push(new_action);
-                        eprintln!("Successfully updated binding (new action)");
+                        log::info!("Successfully updated binding (new action)");
                         return Ok(());
                     }
                 } else {
@@ -324,15 +324,15 @@ fn update_binding(
                     let new_action_map =
                         ActionMaps::new_empty_action_map(action_map_name.clone(), vec![new_action]);
                     bindings.action_maps.push(new_action_map);
-                    eprintln!("Successfully updated binding (new action map)");
+                    log::info!("Successfully updated binding (new action map)");
                     return Ok(());
                 }
             }
         } else {
-            eprintln!("Action not found in all_binds either - invalid action");
+            log::info!("Action not found in all_binds either - invalid action");
         }
     } else {
-        eprintln!("AllBinds not available");
+        log::info!("AllBinds not available");
     }
 
     Err("Action not found".to_string())
@@ -346,7 +346,7 @@ fn reset_binding(
 ) -> Result<(), String> {
     let mut app_state = state.lock().unwrap();
 
-    eprintln!(
+    log::info!(
         "Resetting binding for action: {} in map: {}",
         action_name, action_map_name
     );
@@ -361,7 +361,7 @@ fn reset_binding(
         {
             // Remove the action entirely
             action_map.actions.retain(|a| a.name != action_name);
-            eprintln!("Removed custom binding for action: {}", action_name);
+            log::info!("Removed custom binding for action: {}", action_name);
 
             // If the action map is now empty, optionally remove it
             // (keeping empty action maps shouldn't cause issues)
@@ -653,8 +653,8 @@ fn load_all_binds(
                     .ok_or_else(|| "Failed to get exe directory".to_string())?;
                 let path3 = exe_dir.join("AllBinds.xml");
 
-                eprintln!("[AllBinds] Tried paths: {:?}, {:?}, {:?}", path1, path2, path3);
-                eprintln!("[AllBinds] Using: {:?}", path3);
+                log::info!("[AllBinds] Tried paths: {:?}, {:?}, {:?}", path1, path2, path3);
+                log::info!("[AllBinds] Using: {:?}", path3);
                 path3
             }
         }
@@ -742,14 +742,14 @@ fn get_user_customizations(
 ) -> Result<Option<ActionMaps>, String> {
     let app_state = state.lock().unwrap();
 
-    eprintln!("get_user_customizations called");
-    eprintln!(
+    log::info!("get_user_customizations called");
+    log::info!(
         "  has_current_bindings: {}",
         app_state.current_bindings.is_some()
     );
     if let Some(ref bindings) = app_state.current_bindings {
-        eprintln!("  action_maps_count: {}", bindings.action_maps.len());
-        eprintln!("  profile_name: {}", bindings.profile_name);
+        log::info!("  action_maps_count: {}", bindings.action_maps.len());
+        log::info!("  profile_name: {}", bindings.profile_name);
     }
 
     // Return a clone of the user's customizations (delta only)
@@ -762,11 +762,11 @@ fn restore_user_customizations(
     customizations: Option<ActionMaps>,
     state: tauri::State<Mutex<AppState>>,
 ) -> Result<(), String> {
-    eprintln!("restore_user_customizations called");
-    eprintln!("  has_data: {}", customizations.is_some());
+    log::info!("restore_user_customizations called");
+    log::info!("  has_data: {}", customizations.is_some());
     if let Some(ref c) = customizations {
-        eprintln!("  action_maps_count: {}", c.action_maps.len());
-        eprintln!("  profile_name: {}", c.profile_name);
+        log::info!("  action_maps_count: {}", c.action_maps.len());
+        log::info!("  profile_name: {}", c.profile_name);
     }
 
     let mut app_state = state.lock().unwrap();
@@ -775,7 +775,7 @@ fn restore_user_customizations(
     // This allows us to preserve unsaved work across app restarts
     app_state.current_bindings = customizations;
 
-    eprintln!("restore_user_customizations completed successfully");
+    log::info!("restore_user_customizations completed successfully");
     Ok(())
 }
 
@@ -845,10 +845,10 @@ fn clear_specific_binding(
     input_to_clear: String,
     state: tauri::State<Mutex<AppState>>,
 ) -> Result<(), String> {
-    eprintln!("clear_specific_binding called with:");
-    eprintln!("  action_map_name: '{}'", action_map_name);
-    eprintln!("  action_name: '{}'", action_name);
-    eprintln!("  input_to_clear: '{}'", input_to_clear);
+    log::info!("clear_specific_binding called with:");
+    log::info!("  action_map_name: '{}'", action_map_name);
+    log::info!("  action_name: '{}'", action_name);
+    log::info!("  input_to_clear: '{}'", input_to_clear);
 
     let mut app_state = state.lock().unwrap();
 
@@ -859,7 +859,7 @@ fn clear_specific_binding(
         activation_mode: String::new(),
     };
     let input_type = clear_rebind.get_input_type();
-    eprintln!("Input type to clear: {:?}", input_type);
+    log::info!("Input type to clear: {:?}", input_type);
 
     // Extract the joystick instance number if it's a joystick binding
     let js_instance = if matches!(input_type, keybindings::InputType::Joystick) {
@@ -907,7 +907,7 @@ fn clear_specific_binding(
         false
     };
 
-    eprintln!("Has default binding: {}", has_default_binding);
+    log::info!("Has default binding: {}", has_default_binding);
 
     // Only create a cleared binding if there's a default to override
     let cleared_input = if has_default_binding {
@@ -929,11 +929,11 @@ fn clear_specific_binding(
         String::new()
     };
 
-    eprintln!("Cleared input string: '{}'", cleared_input);
+    log::info!("Cleared input string: '{}'", cleared_input);
 
     // If there's no default binding and we're just removing, we can delete the entire action if it becomes empty
     if cleared_input.is_empty() {
-        eprintln!("No default binding, removing the binding entirely");
+        log::info!("No default binding, removing the binding entirely");
 
         if let Some(ref mut bindings) = app_state.current_bindings {
             if let Some(action_map) = bindings
@@ -948,7 +948,7 @@ fn clear_specific_binding(
                 {
                     // Remove only the specific binding that matches input_to_clear
                     action.rebinds.retain(|r| r.input != input_to_clear);
-                    eprintln!("Removed binding without adding cleared entry");
+                    log::info!("Removed binding without adding cleared entry");
                 }
             }
         }
@@ -957,7 +957,7 @@ fn clear_specific_binding(
 
     // Initialize current_bindings if it doesn't exist
     if app_state.current_bindings.is_none() {
-        eprintln!("Creating new current_bindings structure");
+        log::info!("Creating new current_bindings structure");
         app_state.current_bindings = Some(ActionMaps {
             profile_name: "User Customizations".to_string(),
             action_maps: Vec::new(),
@@ -1014,7 +1014,7 @@ fn clear_specific_binding(
             activation_mode: String::new(),
         });
 
-        eprintln!("Successfully cleared binding with explicit unbind entry");
+        log::info!("Successfully cleared binding with explicit unbind entry");
         Ok(())
     } else {
         Err("Failed to initialize bindings".to_string())
@@ -1451,6 +1451,36 @@ async fn open_url(app_handle: tauri::AppHandle, url: String) -> Result<(), Strin
         .map_err(|e| format!("Failed to open URL: {}", e))
 }
 
+#[tauri::command]
+fn get_log_file_path(app_handle: tauri::AppHandle) -> Result<String, String> {
+    let log_dir = app_handle
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("Failed to get log directory: {}", e))?;
+
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+    let log_file = log_dir.join(format!("boxxy-binder-{}.log", today));
+
+    Ok(log_file.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn open_log_directory(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let log_dir = app_handle
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("Failed to get log directory: {}", e))?;
+
+    // Open the directory in file explorer
+    app_handle
+        .opener()
+        .open_url(
+            &format!("file://{}", log_dir.to_string_lossy()),
+            None::<&str>,
+        )
+        .map_err(|e| format!("Failed to open log directory: {}", e))
+}
+
 fn setup_logging(app_handle: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     use std::fs::OpenOptions;
     use std::io::Write;
@@ -1519,7 +1549,7 @@ fn cleanup_old_logs(log_dir: &std::path::Path, keep_count: usize) {
     // Remove files beyond the keep count
     for file in log_files.iter().skip(keep_count) {
         if let Err(e) = fs::remove_file(file.path()) {
-            eprintln!("Failed to remove old log file {:?}: {}", file.path(), e);
+            log::info!("Failed to remove old log file {:?}: {}", file.path(), e);
         }
     }
 }
@@ -2093,13 +2123,13 @@ fn get_axis_names_for_device(
     let hid_devices = hid_reader::list_hid_game_controllers()
         .map_err(|e| format!("Failed to list HID devices: {}", e))?;
 
-    eprintln!(
+    log::info!(
         "[Axis Names] Looking for device matching: '{}'",
         device_name
     );
-    eprintln!("[Axis Names] Available HID devices:");
+    log::info!("[Axis Names] Available HID devices:");
     for dev in &hid_devices {
-        eprintln!(
+        log::info!(
             "  - Product: {:?}, Manufacturer: {:?}, Path: {:?}",
             dev.product, dev.manufacturer, dev.path
         );
@@ -2107,13 +2137,13 @@ fn get_axis_names_for_device(
 
     // Try to find a device with a matching name
     if let Some(device) = find_matching_hid_device(&device_name, &hid_devices) {
-        eprintln!(
+        log::info!(
             "[Axis Names] Found HID device for '{}': {:?}",
             device_name, device.product
         );
         hid_reader::get_axis_names_from_descriptor(&device.path)
     } else {
-        eprintln!(
+        log::info!(
             "[Axis Names] No matching HID device found for '{}'",
             device_name
         );
@@ -2131,19 +2161,19 @@ fn get_directinput_to_hid_mapping(
     let hid_devices = hid_reader::list_hid_game_controllers()
         .map_err(|e| format!("Failed to list HID devices: {}", e))?;
 
-    eprintln!(
+    log::info!(
         "[Axis Mapping] Looking for device matching: '{}'",
         device_name
     );
 
     if let Some(device) = find_matching_hid_device(&device_name, &hid_devices) {
-        eprintln!(
+        log::info!(
             "[Axis Mapping] Found HID device for '{}': {:?}",
             device_name, device.product
         );
         hid_reader::get_directinput_to_hid_axis_mapping(&device.path)
     } else {
-        eprintln!(
+        log::info!(
             "[Axis Mapping] No matching HID device found for '{}'",
             device_name
         );
@@ -2549,6 +2579,7 @@ pub fn run() {
             log_error,
             log_info,
             get_log_file_path,
+            open_log_directory,
             get_resource_dir,
             open_url,
             generate_unbind_profile,
@@ -2579,7 +2610,7 @@ pub fn run() {
         .setup(|app| {
             // Set up logging
             if let Err(e) = setup_logging(app.handle()) {
-                eprintln!("Failed to set up logging: {}", e);
+                log::info!("Failed to set up logging: {}", e);
             }
 
             Ok(())
