@@ -570,6 +570,20 @@ impl InputDetector {
                         // Hat switches need special handling - they should detect any value change
                         let is_hat_switch = axis_id == 0x39;
 
+                        // Debug logging for ALL axes to help diagnose hat detection
+                        if change_abs > 0.0 {
+                            eprintln!(
+                                "[AXIS] Device {}: axis_id=0x{:02x} ({}), current={}, prev={}, change={:.1}, is_hat={}",
+                                device_instance,
+                                axis_id,
+                                current_report.axis_names.get(&axis_id).map(|s| s.as_str()).unwrap_or("Unknown"),
+                                current_value,
+                                prev_value,
+                                change_abs,
+                                is_hat_switch
+                            );
+                        }
+
                         // For hat switches, trigger on any non-zero change
                         // For regular axes, use absolute threshold
                         const AXIS_CHANGE_THRESHOLD: f32 = 50.0; // Absolute value change needed
@@ -610,7 +624,33 @@ impl InputDetector {
                                             .unwrap_or(1)
                                     });
 
-                                let hat_direction = match current_value {
+                                // Debug logging for hat switch values
+                                eprintln!(
+                                    "[HAT] Device {}: axis_id=0x{:02x}, current_value={}, prev_value={}, logical_min={}, logical_max={}, range={}",
+                                    device_instance, axis_id, current_value, prev_value, logical_min, logical_max, range
+                                );
+
+                                // Normalize hat value from logical range to discrete 0-8 positions
+                                // Most hats use 0-7 for 8 directions, 8 or 15 for center
+                                // But some devices (like vjoy) might use a wider logical range
+                                let hat_discrete_value = if logical_max <= 8 {
+                                    // Already discrete (0-7 or 0-8), use as-is
+                                    current_value as u32
+                                } else if logical_max == 15 {
+                                    // Some devices use 0-15 where 0-7 are directions, 15 is center
+                                    current_value as u32
+                                } else {
+                                    // Normalize from logical range to 0-8 discrete positions
+                                    // Map the full range to 0-8, where values near the extremes become 0-7
+                                    // and centered/null values map to 8
+                                    let normalized_0_to_1 = (current_value as i32 - logical_min) as f32 / range;
+                                    let discrete = (normalized_0_to_1 * 8.0).round() as u32;
+                                    discrete.min(8)
+                                };
+
+                                eprintln!("[HAT] Discrete value: {}", hat_discrete_value);
+
+                                let hat_direction = match hat_discrete_value {
                                     0 => Some("up"),
                                     1 => Some("up"),
                                     2 => Some("right"),

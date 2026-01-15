@@ -7,32 +7,32 @@ const path = require('path');
 const FILES_TO_UPDATE = [
     {
         path: 'package.json',
-        regex: /"version":\s*"(\d+\.\d+\.\d+)"/,
+        regex: /"version":\s*"(\d+\.\d+\.\d+(?:-[\w.]+)?)"/,
         replacement: '"version": "NEW_VERSION"'
     },
     {
         path: 'src-tauri/tauri.conf.json',
-        regex: /"version":\s*"(\d+\.\d+\.\d+)"/,
+        regex: /"version":\s*"(\d+\.\d+\.\d+(?:-[\w.]+)?)"/,
         replacement: '"version": "NEW_VERSION"'
     },
     {
         path: 'src-tauri/Cargo.toml',
-        regex: /^version\s*=\s*"(\d+\.\d+\.\d+)"/m,
+        regex: /^version\s*=\s*"(\d+\.\d+\.\d+(?:-[\w.]+)?)"/m,
         replacement: 'version = "NEW_VERSION"'
     },
     {
         path: 'src/index.html',
-        regex: /<span id="app-version">v(\d+\.\d+\.\d+)<\/span>/,
+        regex: /<span id="app-version">v(\d+\.\d+\.\d+(?:-[\w.]+)?)<\/span>/,
         replacement: '<span id="app-version">vNEW_VERSION</span>'
     },
     {
         path: 'src/main.js',
-        regex: /const CURRENT_VERSION = '(\d+\.\d+\.\d+)';/g,
+        regex: /const CURRENT_VERSION = '(\d+\.\d+\.\d+(?:-[\w.]+)?)';/g,
         replacement: "const CURRENT_VERSION = 'NEW_VERSION';"
     },
     {
         path: 'src/index.html',
-        regex: /<button class="whats-new-version-toggle" data-version="(\d+\.\d+\.\d+)">\s*<span class="version-toggle-arrow">▼<\/span>\s*<span class="version-toggle-label">v(\d+\.\d+\.\d+)<\/span>/,
+        regex: /<button class="whats-new-version-toggle" data-version="(\d+\.\d+\.\d+(?:-[\w.]+)?)">\s*<span class="version-toggle-arrow">▼<\/span>\s*<span class="version-toggle-label">v(\d+\.\d+\.\d+(?:-[\w.]+)?)<\/span>/,
         replacement: '<button class="whats-new-version-toggle" data-version="NEW_VERSION">\n            <span class="version-toggle-arrow">▼</span>\n            <span class="version-toggle-label">vNEW_VERSION</span>'
     }
 ];
@@ -67,7 +67,9 @@ try
 // Handle increment keywords
 if (['patch', 'minor', 'major'].includes(newVersion.toLowerCase()))
 {
-    const parts = currentVersion.split('.').map(Number);
+    // Strip pre-release tag if present
+    const baseVersion = currentVersion.split('-')[0];
+    const parts = baseVersion.split('.').map(Number);
     if (parts.length !== 3)
     {
         console.error(`❌ Current version '${currentVersion}' is not in x.y.z format.`);
@@ -93,10 +95,10 @@ if (['patch', 'minor', 'major'].includes(newVersion.toLowerCase()))
     console.log(`Incrementing version: ${currentVersion} -> ${newVersion}`);
 }
 
-// Validate version format (simple semantic versioning)
-if (!/^\d+\.\d+\.\d+$/.test(newVersion))
+// Validate version format (semantic versioning with optional pre-release tag)
+if (!/^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(newVersion))
 {
-    console.error('Error: Invalid version format. Please use x.y.z (e.g., 0.7.2)');
+    console.error('Error: Invalid version format. Please use x.y.z or x.y.z-prerelease (e.g., 0.7.2 or 0.7.2-plasma)');
     process.exit(1);
 }
 
