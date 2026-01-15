@@ -614,7 +614,7 @@ fn load_all_binds(
     state: tauri::State<Mutex<AppState>>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
-    // Load AllBinds.xml from resources
+    // Load AllBinds.xml from resources with fallback logic
     let all_binds_path = if cfg!(debug_assertions) {
         // Development: look in project root
         let exe_path =
@@ -629,14 +629,35 @@ fn load_all_binds(
             .ok_or_else(|| "Failed to find project root".to_string())?
             .join("AllBinds.xml")
     } else {
-        // Production: use Tauri's resource resolver
-        // File is in the resources subfolder within resources
-        app_handle
+        // Production: try multiple locations in order of preference
+        let resource_dir = app_handle
             .path()
             .resource_dir()
-            .map_err(|e| format!("Failed to get resource dir: {}", e))?
-            .join(RESOURCES_SUBFOLDER)
-            .join("AllBinds.xml")
+            .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+
+        // Try 1: resources/_up_/AllBinds.xml (standard installed location)
+        let path1 = resource_dir.join(RESOURCES_SUBFOLDER).join("AllBinds.xml");
+        if path1.exists() {
+            path1
+        } else {
+            // Try 2: resources/AllBinds.xml (fallback without subfolder)
+            let path2 = resource_dir.join("AllBinds.xml");
+            if path2.exists() {
+                path2
+            } else {
+                // Try 3: AllBinds.xml in exe directory (for standalone exe)
+                let exe_path = std::env::current_exe()
+                    .map_err(|e| format!("Failed to get exe path: {}", e))?;
+                let exe_dir = exe_path
+                    .parent()
+                    .ok_or_else(|| "Failed to get exe directory".to_string())?;
+                let path3 = exe_dir.join("AllBinds.xml");
+
+                eprintln!("[AllBinds] Tried paths: {:?}, {:?}, {:?}", path1, path2, path3);
+                eprintln!("[AllBinds] Using: {:?}", path3);
+                path3
+            }
+        }
     };
 
     // Read the XML file
@@ -655,7 +676,7 @@ fn load_all_binds(
 
 #[tauri::command]
 fn get_all_binds_xml(app_handle: tauri::AppHandle) -> Result<String, String> {
-    // Get the AllBinds.xml path
+    // Get the AllBinds.xml path with fallback logic
     let all_binds_path = if cfg!(debug_assertions) {
         // Development: look in project root
         let exe_path =
@@ -670,13 +691,31 @@ fn get_all_binds_xml(app_handle: tauri::AppHandle) -> Result<String, String> {
             .ok_or_else(|| "Failed to find project root".to_string())?
             .join("AllBinds.xml")
     } else {
-        // Production: use Tauri's resource resolver
-        app_handle
+        // Production: try multiple locations in order of preference
+        let resource_dir = app_handle
             .path()
             .resource_dir()
-            .map_err(|e| format!("Failed to get resource dir: {}", e))?
-            .join(RESOURCES_SUBFOLDER)
-            .join("AllBinds.xml")
+            .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+
+        // Try 1: resources/_up_/AllBinds.xml (standard installed location)
+        let path1 = resource_dir.join(RESOURCES_SUBFOLDER).join("AllBinds.xml");
+        if path1.exists() {
+            path1
+        } else {
+            // Try 2: resources/AllBinds.xml (fallback without subfolder)
+            let path2 = resource_dir.join("AllBinds.xml");
+            if path2.exists() {
+                path2
+            } else {
+                // Try 3: AllBinds.xml in exe directory (for standalone exe)
+                let exe_path = std::env::current_exe()
+                    .map_err(|e| format!("Failed to get exe path: {}", e))?;
+                let exe_dir = exe_path
+                    .parent()
+                    .ok_or_else(|| "Failed to get exe directory".to_string())?;
+                exe_dir.join("AllBinds.xml")
+            }
+        }
     };
 
     // Read and return the raw XML content

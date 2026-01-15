@@ -491,6 +491,33 @@ impl InputDetector {
                         Err(_) => continue,
                     };
 
+                // Log all axes on first report for this device to help diagnose hat detection
+                if !self.prev_hid_reports.contains_key(&device.path) {
+                    eprintln!("[HID] Device {} initial axes:", device_instance);
+                    for (&axis_id, &value) in &current_report.axis_values {
+                        let name = current_report
+                            .axis_names
+                            .get(&axis_id)
+                            .map(|s| s.as_str())
+                            .unwrap_or("Unknown");
+                        let (min, max) = current_report
+                            .axis_ranges
+                            .get(&axis_id)
+                            .copied()
+                            .unwrap_or((0, 65535));
+                        eprintln!(
+                            "[HID]   axis_id=0x{:02x} ({:2}): {:<20} value={:5} range=[{}, {}] is_hat={}",
+                            axis_id,
+                            axis_id,
+                            name,
+                            value,
+                            min,
+                            max,
+                            axis_id == 0x39
+                        );
+                    }
+                }
+
                 // Check buttons - only detect NEW button presses (not held buttons)
                 // Skip detection on the very first poll for this device (baseline establishment)
                 let prev_buttons = self
