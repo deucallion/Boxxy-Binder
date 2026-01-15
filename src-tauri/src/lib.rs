@@ -1438,141 +1438,6 @@ async fn open_url(app_handle: tauri::AppHandle, url: String) -> Result<(), Strin
         .map_err(|e| format!("Failed to open URL: {}", e))
 }
 
-#[tauri::command]
-fn get_log_file_path(app_handle: tauri::AppHandle) -> Result<String, String> {
-    let log_dir = app_handle
-        .path()
-        .app_log_dir()
-        .map_err(|e| format!("Failed to get log directory: {}", e))?;
-
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-    let log_file = log_dir.join(format!("boxxy-binder-{}.log", today));
-
-    Ok(log_file.to_string_lossy().to_string())
-}
-
-#[tauri::command]
-async fn open_log_directory(app_handle: tauri::AppHandle) -> Result<(), String> {
-    let log_dir = app_handle
-        .path()
-        .app_log_dir()
-        .map_err(|e| format!("Failed to get log directory: {}", e))?;
-
-    // Open the directory in file explorer
-    app_handle
-        .opener()
-        .open_url(
-            &format!("file://{}", log_dir.to_string_lossy()),
-            None::<&str>,
-        )
-        .map_err(|e| format!("Failed to open log directory: {}", e))
-}
-
-fn setup_logging(app_handle: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    use std::fs::OpenOptions;
-    use std::io::Write;
-
-    // Get log directory
-    let log_dir = app_handle.path().app_log_dir()?;
-    std::fs::create_dir_all(&log_dir)?;
-
-    // Use date-based log file name
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-    let log_file = log_dir.join(format!("boxxy-binder-{}.log", today));
-
-    // Write startup marker to file directly (before logger is initialized)
-    {
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_file)?;
-        writeln!(
-            file,
-            "\n[{}] INFO - === Boxxy Binder Started ===",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
-        )?;
-        writeln!(
-            file,
-            "[{}] INFO - Version: {}",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-            env!("CARGO_PKG_VERSION")
-        )?;
-        writeln!(
-            file,
-            "[{}] INFO - Log file: {:?}",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-            log_file
-        )?;
-    }
-
-    // Clean up old log files (keep only the last 3 days)
-    cleanup_old_logs(&log_dir, 3);
-
-    // Set up file logging with env_logger
-    let target = Box::new(
-        OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_file)?,
-    );
-
-    // IMPORTANT: Set filter level to Info by default, don't rely on RUST_LOG env var
-    env_logger::Builder::new()
-        .filter_level(log::LevelFilter::Info)  // Enable Info level logging by default
-        .target(env_logger::Target::Pipe(target))
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "[{}] {} - {}",
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                record.level(),
-                record.args()
-            )
-        })
-        .try_init()
-        .map_err(|e| format!("Logger already initialized: {}", e))?;
-
-    log::info!("Logger initialized successfully");
-
-    Ok(())
-}
-/// Clean up old log files, keeping only the specified number of most recent files
-fn cleanup_old_logs(log_dir: &std::path::Path, keep_count: usize) {
-    use std::fs;
-
-    let entries = match fs::read_dir(log_dir) {
-        Ok(entries) => entries,
-        Err(_) => return,
-    };
-
-    // Collect all log files matching our pattern
-    let mut log_files: Vec<_> = entries
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| {
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-            name_str.starts_with("boxxy-binder-") && name_str.ends_with(".log")
-        })
-        .collect();
-
-    // Sort by filename (which contains the date, so alphabetical order = chronological order)
-    log_files.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
-
-    // Remove files beyond the keep count
-    for file in log_files.iter().skip(keep_count) {
-        if let Err(e) = fs::remove_file(file.path()) {
-            log::info!("Failed to remove old log file {:?}: {}", file.path(), e);
-        }
-    }
-}
-
-// Struct for unbind profile generation result
-#[derive(serde::Serialize)]
-struct UnbindProfileResult {
-    saved_locations: Vec<String>,
-}
-
-// Struct for unbind profile removal result
 #[derive(serde::Serialize)]
 struct RemoveUnbindResult {
     removed_count: usize,
@@ -2590,8 +2455,6 @@ pub fn run() {
             write_binary_file,
             log_error,
             log_info,
-            get_log_file_path,
-            open_log_directory,
             get_resource_dir,
             open_url,
             generate_unbind_profile,
@@ -2620,42 +2483,13 @@ pub fn run() {
             find_actionmaps_path
         ])
         .setup(|app| {
-            // Set up logging - if it fails, write error to a fallback file
-            if let Err(e) = setup_logging(app.handle()) {
-                // Fallback error logging if setup fails
-                use std::fs::OpenOptions;
-                use std::io::Write;
-                
-                if let Ok(app_dir) = app.path().app_log_dir() {
-                    let _ = std::fs::create_dir_all(&app_dir);
-                    if let Ok(mut file) = OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(app_dir.join("logging-error.txt"))
-                    {
-                        let _ = writeln!(
-                            file,
-                            "[{}] CRITICAL: Failed to set up logging: {}",
-                            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                            e
-                        );
-                    }
-                }
-                // Also try to show an alert
-                let _ = tauri::async_runtime::block_on(async {
-                    tauri::async_runtime::spawn(async move {
-                        // Don't block the app, just log the error
-                    });
-                });
-            }
-
+            Ok(())
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { .. } = event {
-                info!("=== SC Joy Mapper Shutting Down ===");
             }
         });
 }

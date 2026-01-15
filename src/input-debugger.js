@@ -555,17 +555,3 @@ window.initializeDebugger = function ()
     updateStats();
 };
 
-// Open logs button handler
-document.addEventListener('DOMContentLoaded', () => {
-    const openLogsBtn = document.getElementById('dm-open-logs-btn');
-    if (openLogsBtn) {
-        openLogsBtn.addEventListener('click', async () => {
-            try {
-                await invoke('open_log_directory');
-            } catch (error) {
-                console.error('Failed to open log directory:', error);
-                alert('Failed to open log directory: ' + error);
-            }
-        });
-    }
-});

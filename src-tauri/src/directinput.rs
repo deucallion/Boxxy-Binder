@@ -491,14 +491,6 @@ impl InputDetector {
                         Err(_) => continue,
                     };
 
-                // DIAGNOSTIC: Log ALL hat values in EVERY report to see if they're changing
-                // Check base hat (0x39 = 57) and all duplicate hats (5701, 5702, 5703, etc.)
-                for (&axis_id, &value) in &current_report.axis_values {
-                    // Check if this is a hat: base ID 0x39, or derivative IDs (5700-5799)
-                    if axis_id == 0x39 || (axis_id >= 5700 && axis_id < 5800) {
-                        log::info!("[HID POLL] Device {}: Hat (axis_id=0x{:04x}) = {}", device_instance, axis_id, value);
-                    }
-                }
 
                 // Log all axes on first report for this device to help diagnose hat detection
                 if !self.prev_hid_reports.contains_key(&device.path) {
