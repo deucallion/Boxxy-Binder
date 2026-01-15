@@ -2651,7 +2651,6 @@ pub fn run() {
 
             Ok(())
         })
-        })
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|_app_handle, event| {
