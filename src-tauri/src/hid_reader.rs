@@ -179,6 +179,9 @@ pub fn parse_hid_full_report(report: &[u8], descriptor: &[u8]) -> Result<HidFull
     let mut max_bits = 8;
     let mut button_index: u32 = 1; // 1-based button numbering
 
+    // Track usage ID occurrences to handle duplicate IDs (like 4 hats with same usage ID)
+    let mut usage_id_counts: HashMap<u32, u32> = HashMap::new();
+
     // Extract values from each field
     for field in input_report.fields() {
         match field {
@@ -217,8 +220,20 @@ pub fn parse_hid_full_report(report: &[u8], descriptor: &[u8]) -> Result<HidFull
                 let usage_val: u32 =
                     ((usage_page as u32) << 16) | (u16::from(var.usage.usage_id) as u32);
 
-                // Use the usage ID as the axis index for consistency
-                let axis_index = u16::from(var.usage.usage_id) as u32;
+                let base_usage_id = u16::from(var.usage.usage_id) as u32;
+
+                // Handle duplicate usage IDs (e.g., 4 hat switches all with ID 0x39)
+                // Create unique axis index by adding occurrence count
+                let occurrence = usage_id_counts.entry(base_usage_id).or_insert(0);
+                let axis_index = if *occurrence > 0 {
+                    // This is a duplicate - encode as: (base_id * 100) + occurrence
+                    // e.g., 0x39 becomes 0x390, 0x391, 0x392, 0x393 for 4 hats
+                    base_usage_id * 100 + *occurrence
+                } else {
+                    // First occurrence - use the original ID
+                    base_usage_id
+                };
+                *occurrence += 1;
 
                 // Extract the value
                 match var.extract(report) {

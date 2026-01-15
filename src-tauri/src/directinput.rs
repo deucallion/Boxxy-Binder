@@ -491,9 +491,13 @@ impl InputDetector {
                         Err(_) => continue,
                     };
 
-                // DIAGNOSTIC: Log hat values in EVERY report to see if they're changing
-                if let Some(&hat_value) = current_report.axis_values.get(&0x39) {
-                    log::info!("[HID POLL] Device {}: Hat (0x39) = {}", device_instance, hat_value);
+                // DIAGNOSTIC: Log ALL hat values in EVERY report to see if they're changing
+                // Check base hat (0x39 = 57) and all duplicate hats (5701, 5702, 5703, etc.)
+                for (&axis_id, &value) in &current_report.axis_values {
+                    // Check if this is a hat: base ID 0x39, or derivative IDs (5700-5799)
+                    if axis_id == 0x39 || (axis_id >= 5700 && axis_id < 5800) {
+                        log::info!("[HID POLL] Device {}: Hat (axis_id=0x{:04x}) = {}", device_instance, axis_id, value);
+                    }
                 }
 
                 // Log all axes on first report for this device to help diagnose hat detection
@@ -518,7 +522,7 @@ impl InputDetector {
                             value,
                             min,
                             max,
-                            axis_id == 0x39
+                            axis_id == 0x39 || (axis_id >= 5700 && axis_id < 5800)
                         );
                     }
                 }
@@ -600,7 +604,7 @@ impl InputDetector {
 
                         // Hat switch check (HID Usage ID 0x39 = 57)
                         // Hat switches need special handling - they should detect any value change
-                        let is_hat_switch = axis_id == 0x39;
+                        let is_hat_switch = axis_id == 0x39 || (axis_id >= 5700 && axis_id < 5800);
 
                         // Debug logging for ALL axes to help diagnose hat detection
                         if change_abs > 0.0 {
