@@ -1404,19 +1404,6 @@ fn log_info(message: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_log_file_path(app_handle: tauri::AppHandle) -> Result<String, String> {
-    let log_dir = app_handle
-        .path()
-        .app_log_dir()
-        .map_err(|e| format!("Failed to get log directory: {}", e))?;
-
-    // Use date-based log file name
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-    let log_file = log_dir.join(format!("boxxy-binder-{}.log", today));
-    Ok(log_file.to_string_lossy().to_string())
-}
-
-#[tauri::command]
 fn get_resource_dir(app_handle: tauri::AppHandle) -> Result<String, String> {
     let resource_dir = if cfg!(debug_assertions) {
         // Development: look in project root
