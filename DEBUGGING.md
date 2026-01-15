@@ -27,36 +27,38 @@ C:\Users\YourName\Downloads\
 
 ### 3. Viewing Debug Output
 
-The app writes debug information to the console, which isn't visible in normal GUI mode.
+The app writes debug information to log files automatically. **No command prompt needed!**
 
-**To see console output:**
+**To view logs:**
 
-**Method 1: Run from Command Prompt**
-```cmd
-cd C:\path\to\boxxy-binder
-boxxy-binder.exe > debug.txt 2>&1
+**Method 1: Use the View Logs Button (Easiest)**
+1. Open Boxxy Binder
+2. Go to the **Input Debugger** tab
+3. Click the **📄 View Logs** button
+4. Windows Explorer opens the logs folder
+5. Open today's log file: `boxxy-binder-2026-01-15.log`
+
+**Method 2: Manual Path**
+
+Logs are stored at:
+```
+C:\Users\YourUsername\AppData\Roaming\com.boxxy.boxxy-binder\logs\
 ```
 
-Then open `debug.txt` to see all debug output.
+Open today's date file to see current logs.
 
-**Method 2: Run in Command Prompt directly**
-```cmd
-cd C:\path\to\boxxy-binder
-boxxy-binder.exe
-```
+### 4. What to Look For in Log Files
 
-Keep the command prompt open - debug output will appear there.
-
-### 4. What to Look For in Debug Output
-
-When you start the app with your vjoy device connected, you should see output like:
+When you start the app with your vjoy device connected, the log file should contain lines like:
 
 ```
-[HID] Device 1 initial axes:
-[HID]   axis_id=0x30 (48): X                    value=32768 range=[0, 65535] is_hat=false
-[HID]   axis_id=0x31 (49): Y                    value=32768 range=[0, 65535] is_hat=false
-[HID]   axis_id=0x39 (57): Hat Switch           value=    8 range=[0, 15] is_hat=true
+[2026-01-15 12:34:56] INFO - [HID] Device 1 initial axes:
+[2026-01-15 12:34:56] INFO - [HID]   axis_id=0x30 (48): X                    value=32768 range=[0, 65535] is_hat=false
+[2026-01-15 12:34:56] INFO - [HID]   axis_id=0x31 (49): Y                    value=32768 range=[0, 65535] is_hat=false
+[2026-01-15 12:34:56] INFO - [HID]   axis_id=0x39 (57): Hat Switch           value=    8 range=[0, 15] is_hat=true
 ```
+
+**Pro Tip:** Use Ctrl+F in Notepad to search for "[HID] Device" to jump to device initialization logs.
 
 **Key things to check:**
 
@@ -74,18 +76,19 @@ When you start the app with your vjoy device connected, you should see output li
 
 ### 5. When You Move the Hat
 
-After initial detection, when you move the hat you should see:
+After initial detection, when you move the hat you should see in the log:
 
 ```
-[AXIS] Device 1: axis_id=0x39 (Hat Switch), current=0, prev=8, change=8.0, is_hat=true
-[HAT] Device 1: axis_id=0x39, current_value=0, prev_value=8, logical_min=0, logical_max=15, range=15.0
-[HAT] Discrete value: 0
+[2026-01-15 12:35:10] INFO - [AXIS] Device 1: axis_id=0x39 (Hat Switch), current=0, prev=8, change=8.0, is_hat=true
+[2026-01-15 12:35:10] INFO - [HAT] Device 1: axis_id=0x39, current_value=0, prev_value=8, logical_min=0, logical_max=15, range=15.0
+[2026-01-15 12:35:10] INFO - [HAT] Discrete value: 0
 ```
 
 **If you don't see these messages when moving the hat:**
 - The device might not be reporting hat changes via HID
 - Try checking Windows Game Controllers panel to verify the hat works
 - The hat might be reported as buttons instead of an axis
+- **Check the timestamps** - make sure you're looking at recent log entries
 
 ### 6. Common Issues
 
@@ -107,9 +110,16 @@ After initial detection, when you move the hat you should see:
 If you're still having issues, please provide:
 
 1. **Build type used** (MSI, NSIS, or standalone exe)
-2. **Debug output** from running `boxxy-binder.exe > debug.txt`
+2. **Today's log file** from `C:\Users\YourUsername\AppData\Roaming\com.boxxy.boxxy-binder\logs\`
+   - You can attach the entire .log file or copy relevant [HID] sections
 3. **Device information** (vjoy version, configuration)
 4. **Screenshot** of Windows Game Controllers showing the hat working
+5. **Screenshot** of Input Debugger tab while moving the hat
+
+**To get the log file quickly:**
+- Click "📄 View Logs" in Input Debugger tab
+- Copy today's .log file
+- Attach to GitHub issue
 
 Post this information in a GitHub issue for assistance.
 
