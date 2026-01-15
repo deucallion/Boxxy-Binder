@@ -1480,6 +1480,31 @@ fn setup_logging(app_handle: &tauri::AppHandle) -> Result<(), Box<dyn std::error
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
     let log_file = log_dir.join(format!("boxxy-binder-{}.log", today));
 
+    // Write startup marker to file directly (before logger is initialized)
+    {
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&log_file)?;
+        writeln!(
+            file,
+            "\n[{}] INFO - === Boxxy Binder Started ===",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+        )?;
+        writeln!(
+            file,
+            "[{}] INFO - Version: {}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            env!("CARGO_PKG_VERSION")
+        )?;
+        writeln!(
+            file,
+            "[{}] INFO - Log file: {:?}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            log_file
+        )?;
+    }
+
     // Clean up old log files (keep only the last 3 days)
     cleanup_old_logs(&log_dir, 3);
 
@@ -1491,7 +1516,9 @@ fn setup_logging(app_handle: &tauri::AppHandle) -> Result<(), Box<dyn std::error
             .open(&log_file)?,
     );
 
-    env_logger::Builder::from_default_env()
+    // IMPORTANT: Set filter level to Info by default, don't rely on RUST_LOG env var
+    env_logger::Builder::new()
+        .filter_level(log::LevelFilter::Info)  // Enable Info level logging by default
         .target(env_logger::Target::Pipe(target))
         .format(|buf, record| {
             writeln!(
@@ -1502,15 +1529,13 @@ fn setup_logging(app_handle: &tauri::AppHandle) -> Result<(), Box<dyn std::error
                 record.args()
             )
         })
-        .init();
+        .try_init()
+        .map_err(|e| format!("Logger already initialized: {}", e))?;
 
-    info!("=== SC Joy Mapper Started ===");
-    info!("Version: {}", env!("CARGO_PKG_VERSION"));
-    info!("Log file: {:?}", log_file);
+    log::info!("Logger initialized successfully");
 
     Ok(())
 }
-
 /// Clean up old log files, keeping only the specified number of most recent files
 fn cleanup_old_logs(log_dir: &std::path::Path, keep_count: usize) {
     use std::fs;
@@ -2595,12 +2620,37 @@ pub fn run() {
             find_actionmaps_path
         ])
         .setup(|app| {
-            // Set up logging
+            // Set up logging - if it fails, write error to a fallback file
             if let Err(e) = setup_logging(app.handle()) {
-                log::info!("Failed to set up logging: {}", e);
+                // Fallback error logging if setup fails
+                use std::fs::OpenOptions;
+                use std::io::Write;
+                
+                if let Ok(app_dir) = app.path().app_log_dir() {
+                    let _ = std::fs::create_dir_all(&app_dir);
+                    if let Ok(mut file) = OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(app_dir.join("logging-error.txt"))
+                    {
+                        let _ = writeln!(
+                            file,
+                            "[{}] CRITICAL: Failed to set up logging: {}",
+                            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                            e
+                        );
+                    }
+                }
+                // Also try to show an alert
+                let _ = tauri::async_runtime::block_on(async {
+                    tauri::async_runtime::spawn(async move {
+                        // Don't block the app, just log the error
+                    });
+                });
             }
 
             Ok(())
+        })
         })
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
